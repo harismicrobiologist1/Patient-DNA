@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
@@ -13,7 +14,22 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
+
+// In-memory / File-backed Database Store
+const DATA_FILE_PATH = path.join(__dirname, "patients_database_store.json");
+
+// In-memory active OTP codes store: key = `${doctorName}-${patientDnaId}`
+interface OtpEntry {
+  code: string;
+  patientDnaId: string;
+  patientName: string;
+  doctorName: string;
+  expiresAt: number;
+  maskedEmail: string;
+  maskedPhone: string;
+}
+const activeOtps = new Map<string, OtpEntry>();
 
 // Lazy init Gemini AI instance
 function getGeminiAI() {
@@ -30,6 +46,128 @@ function getGeminiAI() {
     },
   });
 }
+
+// ----------------------------------------------------
+// Lifetime Database Persistence Endpoints
+// ----------------------------------------------------
+app.get("/api/database/load", (req, res) => {
+  try {
+    if (fs.existsSync(DATA_FILE_PATH)) {
+      const dataStr = fs.readFileSync(DATA_FILE_PATH, "utf-8");
+      const parsed = JSON.parse(dataStr);
+      return res.json({ success: true, database: parsed.database, auditLogs: parsed.auditLogs || [] });
+    }
+    return res.json({ success: true, database: null, auditLogs: null });
+  } catch (err: any) {
+    console.error("Error reading database store:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/database/save", (req, res) => {
+  try {
+    const { database, auditLogs } = req.body;
+    if (!database) {
+      return res.status(400).json({ success: false, error: "Database payload missing" });
+    }
+    fs.writeFileSync(
+      DATA_FILE_PATH,
+      JSON.stringify({ database, auditLogs, updatedAt: new Date().toISOString() }, null, 2),
+      "utf-8"
+    );
+    return res.json({ success: true, message: "Database permanently saved to lifetime disk storage" });
+  } catch (err: any) {
+    console.error("Error writing database store:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// Doctor Patient OTP Consent Endpoints
+// ----------------------------------------------------
+app.post("/api/auth/request-doctor-otp", (req, res) => {
+  try {
+    const { patientDnaId, patientName, patientEmail, patientPhone, doctorName, department, hospital } = req.body;
+
+    if (!patientDnaId) {
+      return res.status(400).json({ success: false, error: "patientDnaId is required" });
+    }
+
+    // Generate random 6-digit OTP code
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    // Mask contact for privacy
+    const email = patientEmail || "patient@healthdna.org";
+    const phone = patientPhone || "+1 (555) 019-0000";
+
+    const parts = email.split("@");
+    const namePart = parts[0] || "patient";
+    const maskedEmail = `${namePart.substring(0, 2)}***${namePart.substring(namePart.length - 1)}@${parts[1] || "healthdna.org"}`;
+    const maskedPhone = phone.replace(/(\d{3})\d{4}(\d{2})/, "$1****$2");
+
+    const key = `${doctorName || "Dr. Marcus Vance"}-${patientDnaId}`;
+    const otpEntry: OtpEntry = {
+      code: generatedOtp,
+      patientDnaId,
+      patientName: patientName || "Patient",
+      doctorName: doctorName || "Dr. Marcus Vance",
+      expiresAt,
+      maskedEmail,
+      maskedPhone,
+    };
+    activeOtps.set(key, otpEntry);
+
+    return res.json({
+      success: true,
+      otpCode: generatedOtp, // returned for demonstration & client simulation notification
+      expiresAt,
+      maskedEmail,
+      maskedPhone,
+      message: `OTP securely dispatched to ${maskedEmail} and ${maskedPhone}`,
+    });
+  } catch (err: any) {
+    console.error("Error requesting doctor OTP:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/auth/verify-doctor-otp", (req, res) => {
+  try {
+    const { patientDnaId, doctorName, otpCode } = req.body;
+    const key = `${doctorName || "Dr. Marcus Vance"}-${patientDnaId}`;
+    const entry = activeOtps.get(key);
+
+    if (!entry) {
+      return res.status(400).json({ success: false, error: "No active OTP request found for this patient. Please request a new OTP." });
+    }
+
+    if (Date.now() > entry.expiresAt) {
+      activeOtps.delete(key);
+      return res.status(400).json({ success: false, error: "OTP has expired. Please generate a new one." });
+    }
+
+    if (entry.code !== String(otpCode).trim()) {
+      return res.status(400).json({ success: false, error: "Invalid OTP code entered. Please verify with patient." });
+    }
+
+    // Success! Consume OTP
+    activeOtps.delete(key);
+
+    const token = `AUTH-DR-CONSENT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    return res.json({
+      success: true,
+      verified: true,
+      sessionToken: token,
+      expiresInMinutes: 60,
+      message: "Patient consent successfully verified via OTP.",
+    });
+  } catch (err: any) {
+    console.error("Error verifying doctor OTP:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // AI API Routes
 app.post("/api/ai/symptom-analysis", async (req, res) => {

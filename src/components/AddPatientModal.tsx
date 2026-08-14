@@ -15,6 +15,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 
 interface AddPatientModalProps {
@@ -52,12 +57,47 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
   // Clinical Defaults
   const [initialAllergy, setInitialAllergy] = useState("");
   const [initialChronicCondition, setInitialChronicCondition] = useState("");
+  const [initialMedicine, setInitialMedicine] = useState("");
+
+  // Account Security Credentials (for Patient Self-Login)
+  const [password, setPassword] = useState("Patient@2026");
+  const [confirmPassword, setConfirmPassword] = useState("Patient@2026");
+  const [showPassword, setShowPassword] = useState(false);
+  const [securityPin, setSecurityPin] = useState("1234");
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  // Password strength check
+  const getPasswordStrength = (pwd: string) => {
+    if (!pwd || pwd.length < 6) return { label: "Too Short (Min 6 chars)", color: "text-rose-500", bar: "w-1/4 bg-rose-500" };
+    if (pwd.length >= 8 && /[A-Z]/.test(pwd) && /[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) {
+      return { label: "Strong & Highly Secure", color: "text-emerald-600", bar: "w-full bg-emerald-500" };
+    }
+    if (pwd.length >= 6 && (/[0-9]/.test(pwd) || /[A-Z]/.test(pwd))) {
+      return { label: "Good Strength", color: "text-blue-600", bar: "w-2/3 bg-blue-500" };
+    }
+    return { label: "Fair (Add numbers/symbols)", color: "text-amber-500", bar: "w-1/2 bg-amber-500" };
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !dob) return;
+    setFormError(null);
+
+    if (!fullName || !dob) {
+      setFormError("Please fill in the patient's full name and date of birth.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError("Password must be at least 6 characters long for secure self-login.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError("Password and Confirm Password do not match. Please verify.");
+      return;
+    }
 
     const random1 = Math.floor(1000 + Math.random() * 9000);
     const random2 = Math.floor(1000 + Math.random() * 9000);
@@ -95,6 +135,8 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
       biometricStatus: "Verified",
       organDonorStatus,
       registeredHospital,
+      securityPin: securityPin.trim() || "1234",
+      password: password.trim(),
       insurance: {
         provider: insuranceProvider || "Standard Health Care",
         policyNumber: policyNumber || `POL-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -128,7 +170,21 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
         : [],
       surgeries: [],
       vaccinations: [],
-      medicines: [],
+      medicines: initialMedicine
+        ? [
+            {
+              id: `med-${Date.now()}`,
+              name: initialMedicine,
+              dosage: "Standard Dose",
+              frequency: "Daily",
+              startDate: new Date().toISOString().split("T")[0],
+              duration: "Ongoing",
+              prescribedBy: "Dr. Attending Physician",
+              purpose: "Therapy / Maintenance",
+              refillsRemaining: 3,
+            },
+          ]
+        : [],
       allergies: initialAllergy
         ? [
             {
@@ -436,12 +492,23 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Pre-existing Condition</label>
+                <label className="block font-bold text-slate-700 mb-1">Pre-existing Condition / Disease</label>
                 <input
                   type="text"
                   placeholder="e.g. Hypertension, Type 2 Diabetes, Asthma"
                   value={initialChronicCondition}
                   onChange={(e) => setInitialChronicCondition(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold text-slate-700 mb-1">Current Ongoing Medication (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Metformin 500mg, Lisinopril 10mg, Atorvastatin 20mg"
+                  value={initialMedicine}
+                  onChange={(e) => setInitialMedicine(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
@@ -461,6 +528,159 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
             </div>
           </div>
 
+          {/* Account Security, Password & Privacy PIN */}
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase text-amber-600 tracking-wider flex items-center space-x-2">
+                <Lock className="w-4 h-4 text-amber-500" />
+                <span>Account Password & Self-Login Protection</span>
+              </h3>
+              <span className="text-[11px] font-bold text-slate-500 flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Protected Vault</span>
+              </span>
+            </div>
+
+            <div className="bg-amber-50/70 p-4 sm:p-5 rounded-2xl border border-amber-200 text-xs text-amber-950 space-y-4">
+              <div className="flex items-start space-x-2.5">
+                <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-950">
+                    Patient Self-Login Credentials
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                    Set a secure password so the patient can self-authenticate into their private medical vault. Other patients cannot view your clinical charts without this password or PIN.
+                  </p>
+                </div>
+              </div>
+
+              {/* Password & Confirm Password Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* Account Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-800 text-xs">
+                      Account Password <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-[11px] font-bold text-amber-800 hover:text-amber-900 flex items-center space-x-1"
+                    >
+                      {showPassword ? (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>Hide</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Show</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="Min 6 chars (e.g. Patient@2026)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-amber-300 bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 outline-none"
+                    />
+                  </div>
+                  {/* Strength Meter */}
+                  <div className="mt-1.5 space-y-1">
+                    <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <div className={`h-full transition-all duration-300 ${getPasswordStrength(password).bar}`} />
+                    </div>
+                    <p className={`text-[10px] font-bold ${getPasswordStrength(password).color}`}>
+                      {getPasswordStrength(password).label}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block font-bold text-slate-800 text-xs mb-1">
+                    Confirm Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl border bg-white font-mono text-xs font-bold text-slate-900 focus:ring-2 outline-none ${
+                        confirmPassword && confirmPassword !== password
+                          ? "border-rose-400 focus:ring-rose-500"
+                          : "border-amber-300 focus:ring-amber-500"
+                      }`}
+                    />
+                  </div>
+                  {confirmPassword && confirmPassword !== password && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">
+                      Passwords do not match
+                    </p>
+                  )}
+                  {confirmPassword && confirmPassword === password && (
+                    <p className="text-[10px] font-bold text-emerald-600 mt-1 flex items-center space-x-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Passwords match</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 4-Digit Quick PIN */}
+              <div className="pt-2 border-t border-amber-200/80">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block font-bold text-slate-800 text-xs">
+                      4-Digit Quick Security PIN:
+                    </label>
+                    <span className="text-[10px] text-amber-800">
+                      Optional fast numeric passcode for bedside kiosks and mobile triage.
+                    </span>
+                  </div>
+                  <div className="w-32">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="1234"
+                      value={securityPin}
+                      onChange={(e) => setSecurityPin(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-amber-300 bg-white font-mono font-bold text-slate-900 text-center focus:ring-2 focus:ring-amber-500 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Error Banner */}
+          {formError && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
+          {/* Lifetime Storage Guarantee Notice */}
+          <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 flex items-center space-x-3 text-xs text-blue-900">
+            <Sparkles className="w-5 h-5 text-blue-600 shrink-0" />
+            <div>
+              <span className="font-bold">Lifetime Record Guarantee:</span>
+              <p className="text-[11px] text-blue-800 mt-0.5">
+                This patient record and password are permanently saved to persistent storage. The patient can self-authenticate anytime using their DNA ID and Password.
+              </p>
+            </div>
+          </div>
+
           {/* Action Footer */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
             <button
@@ -476,7 +696,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-lg shadow-blue-500/25 flex items-center space-x-2 transition-all"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Create Patient Profile & DNA ID</span>
+              <span>Register Patient with Password</span>
             </button>
           </div>
         </form>

@@ -21,12 +21,19 @@ import {
   Image as ImageIcon,
   X,
   Sparkles,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  LogOut,
 } from "lucide-react";
 
 interface PatientProfileViewProps {
   patient: PatientProfile;
   onUpdatePatient: (updated: PatientProfile) => void;
   onOpenDigitalId: () => void;
+  onLogout?: () => void;
 }
 
 const PRESET_AVATARS = [
@@ -46,17 +53,60 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
   patient,
   onUpdatePatient,
   onOpenDigitalId,
+  onLogout,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [tempAvatarUrl, setTempAvatarUrl] = useState(patient.avatarUrl);
   const [formData, setFormData] = useState<PatientProfile>(patient);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Password & Security Management State
+  const [newPassword, setNewPassword] = useState(patient.password || "Patient@123");
+  const [confirmPassword, setConfirmPassword] = useState(patient.password || "Patient@123");
+  const [newPin, setNewPin] = useState(patient.securityPin || "1234");
+  const [showPassword, setShowPassword] = useState(false);
+  const [pwdError, setPwdError] = useState<string | null>(null);
+  const [pwdSuccess, setPwdSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     setFormData(patient);
     setTempAvatarUrl(patient.avatarUrl);
+    setNewPassword(patient.password || "Patient@123");
+    setConfirmPassword(patient.password || "Patient@123");
+    setNewPin(patient.securityPin || "1234");
   }, [patient]);
+
+  const handleUpdateSecurityCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError(null);
+    setPwdSuccess(null);
+
+    if (newPassword.length < 6) {
+      setPwdError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwdError("Passwords do not match. Please verify.");
+      return;
+    }
+
+    const updated: PatientProfile = {
+      ...patient,
+      password: newPassword.trim(),
+      securityPin: newPin.trim() || "1234",
+    };
+
+    onUpdatePatient(updated);
+    setPwdSuccess("Password & Security PIN updated successfully!");
+    setTimeout(() => {
+      setIsPasswordModalOpen(false);
+      setPwdSuccess(null);
+    }, 1500);
+  };
 
   const [newContact, setNewContact] = useState<Partial<EmergencyContact>>({
     name: "",
@@ -219,6 +269,16 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
             <Edit2 className="w-4 h-4" />
             <span>{isEditing ? "Cancel Editing" : "Edit Profile"}</span>
           </button>
+          {onLogout && (
+            <button
+              onClick={() => setIsLogoutConfirmOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all shadow-sm group"
+              title="Log out of this patient account"
+            >
+              <LogOut className="w-4 h-4 text-rose-600 group-hover:-translate-x-0.5 transition-transform" />
+              <span>Log Out</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -614,8 +674,181 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Account Password & Self-Login Protection Card */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-white rounded-3xl p-6 border border-amber-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
+              <h3 className="text-base font-bold text-amber-950 flex items-center space-x-2">
+                <Lock className="w-5 h-5 text-amber-600" />
+                <span>Account Password & Credentials</span>
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider flex items-center space-x-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                <span>Active</span>
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white border border-amber-200/80">
+                <div>
+                  <span className="text-slate-600 font-semibold block">Patient Self-Login Password:</span>
+                  <span className="font-mono font-bold text-slate-800 text-sm">••••••••••</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center space-x-1"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Change Password</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white border border-amber-200/80">
+                <div>
+                  <span className="text-slate-600 font-semibold block">4-Digit Security PIN:</span>
+                  <span className="font-mono font-bold text-slate-800 text-sm">
+                    {patient.securityPin || "1234"}
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2.5 py-1 rounded-lg">
+                  Bedside / Kiosk PIN
+                </span>
+              </div>
+
+              {onLogout && (
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-rose-50/70 border border-rose-200 text-rose-950">
+                  <div>
+                    <span className="text-slate-800 font-bold block">Patient Session</span>
+                    <span className="text-[11px] text-slate-500">Sign out of {patient.fullName}'s account</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsLogoutConfirmOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Log Out of Profile</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 relative animate-in fade-in zoom-in-95 duration-200 my-8">
+            <button
+              onClick={() => setIsPasswordModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Update Account Password</h3>
+                <p className="text-xs text-slate-500">
+                  Manage self-login credentials for {patient.fullName}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateSecurityCredentials} className="space-y-4 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">New Password: <span className="text-red-500">*</span></label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                  >
+                    {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    <span>{showPassword ? "Hide" : "Show"}</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Min 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Confirm New Password: <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">4-Digit Quick PIN:</label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="1234"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {pwdError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 font-semibold text-xs">
+                  {pwdError}
+                </div>
+              )}
+
+              {pwdSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-semibold text-xs flex items-center space-x-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>{pwdSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-md transition-all flex items-center space-x-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Save Password & PIN</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Profile Photo Change Modal */}
       {isPhotoModalOpen && (
@@ -731,6 +964,59 @@ export const PatientProfileView: React.FC<PatientProfileViewProps> = ({
               >
                 <Check className="w-4 h-4" />
                 <span>Save Profile Photo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Logout Confirmation Modal */}
+      {isLogoutConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 relative animate-in fade-in zoom-in-95 duration-150 my-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-sm">
+              <LogOut className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-slate-900">
+                Log Out of Patient Profile?
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                You are currently logged into <strong>{patient.fullName}</strong>'s medical vault ({patient.dnaId}).
+                Logging out will lock confidential medical records.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left flex items-center space-x-3">
+              <img
+                src={patient.avatarUrl}
+                alt={patient.fullName}
+                className="w-10 h-10 rounded-xl object-cover ring-2 ring-rose-200"
+              />
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-slate-800 truncate">{patient.fullName}</p>
+                <p className="text-[10px] font-mono text-slate-500 truncate">{patient.dnaId}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsLogoutConfirmOpen(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogoutConfirmOpen(false);
+                  if (onLogout) onLogout();
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Yes, Log Out</span>
               </button>
             </div>
           </div>

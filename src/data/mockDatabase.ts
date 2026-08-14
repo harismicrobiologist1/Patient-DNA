@@ -24,6 +24,8 @@ export const INITIAL_PATIENT: PatientProfile = {
   biometricStatus: "Verified",
   organDonorStatus: true,
   registeredHospital: "Apex National University Medical Center",
+  securityPin: "1234",
+  password: "Patient@123",
   insurance: {
     provider: "Aetna Healthcare Premier Gold",
     policyNumber: "AET-9940218-MED",
@@ -64,6 +66,8 @@ export const PATIENT_SARAH: PatientProfile = {
   biometricStatus: "Verified",
   organDonorStatus: true,
   registeredHospital: "Saint Jude Memorial Hospital",
+  securityPin: "1234",
+  password: "Patient@123",
   insurance: {
     provider: "BlueCross BlueShield CarePlus",
     policyNumber: "BCBS-883102-NY",
@@ -96,6 +100,8 @@ export const PATIENT_DAVID: PatientProfile = {
   biometricStatus: "Verified",
   organDonorStatus: false,
   registeredHospital: "Apex National University Medical Center",
+  securityPin: "1234",
+  password: "Patient@123",
   insurance: {
     provider: "UnitedHealthcare Choice Plus",
     policyNumber: "UHC-992014-M",
